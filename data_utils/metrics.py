@@ -8,12 +8,13 @@ from sklearn.metrics import confusion_matrix
 from scipy.stats import pearsonr, spearmanr
 from seqeval.metrics import classification_report
 from data_utils.squad_eval import evaluate_func
+from data_utils.fmeasure import precision_recall_f1
 
 def compute_acc(predicts, labels):
     return 100.0 * accuracy_score(labels, predicts)
 
 def compute_f1(predicts, labels):
-    return 100.0 * f1_score(labels, predicts)
+    return 100.0 * f1_score(labels, predicts, average='weighted')
 
 def compute_f1mac(predicts, labels):
     return 100.0 * f1_score(labels, predicts, average='macro')
@@ -41,24 +42,49 @@ def compute_cmat(predicts, labels):
     return confusion_matrix(labels, predicts)
 
 def compute_seqacc(predicts, labels, label_mapper):
+    print(label_mapper.__dict__)
+    print(labels[:10])
     y_true, y_pred = [], []
     def trim(predict, label):
         temp_1 =  []
         temp_2 = []
-        for j, m in enumerate(predict):
+        for j in range(len(label)):
+            m = predict[j]
             if j == 0:
                 continue
             if label_mapper[label[j]] != 'X':
                 temp_1.append(label_mapper[label[j]])
                 temp_2.append(label_mapper[m])
+                assert label_mapper[m]!=-1, m
         temp_1.pop()
         temp_2.pop()
+        #print(temp_1)
+        #print(temp_2)
         y_true.append(temp_1)
         y_pred.append(temp_2)
     for predict, label in zip(predicts, labels):
+        #print(predict)
+        #print(label)
+        predict=predict[:len(label)]
+        label=label[:len(predict)]
         trim(predict, label)
+    print('*')
+    print(y_true[:5])
+    print(y_pred[:5])
     report = classification_report(y_true, y_pred,digits=4)
     return report
+
+def compute_seqacc(predicts, labels, label_mapper):
+    print(label_mapper.__dict__)
+    print(labels[:10])
+    y_true,y_pred=[],[]
+    for predict,label in zip(predicts, labels):
+        predict_ = [label_mapper[k] for k in predict][:len(label)]
+        label_ = [label_mapper[k] for k in label][:len(predict)]
+        y_true = y_true + label_
+        y_pred = y_pred + predict_
+    return precision_recall_f1(y_true,y_pred)['__total__']['f1']
+
 
 def compute_emf1(predicts, labels):
     return evaluate_func(labels, predicts)

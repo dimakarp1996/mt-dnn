@@ -38,6 +38,11 @@ def eval_model(model, data, metric_meta, device, with_label=True, label_mapper=N
         golds.extend(gold)
         scores.extend(score)
         ids.extend(batch_info['uids'])
+        #print(torch.cuda.max_memory_allocated(device))
+        #print(torch.cuda.memory_allocated(device))
+        #print(torch.cuda.max_memory_reserved(device))
+        #print(torch.cuda.memory_stats(device))
+        #assert False
 
     if task_type == TaskType.Span:
         from experiments.squad import squad_utils

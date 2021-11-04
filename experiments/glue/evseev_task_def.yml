@@ -1,0 +1,43 @@
+relations:
+  data_format: PremiseAndOneHypothesis
+  dropout_p: 0.05
+  enable_san: false
+  metric_meta:
+  - ACC
+  - F1
+  loss: CeCriterion
+  kd_loss: MseCriterion
+  adv_loss: SymKlCriterion
+  n_class: 22
+  task_type: Classification
+  split_names:
+  - train
+  - dev
+  - test
+ner:
+  data_format: Seqence
+  dropout_p: 0.3
+  enable_san: False
+  labels:
+  - O
+  - B-MISC
+  - I-MISC
+  - B-PER
+  - I-PER
+  - B-ORG
+  - I-ORG
+  - B-LOC
+  - I-LOC
+  - X
+  - CLS
+  - SEP
+  metric_meta:
+  - SeqEval
+  n_class: 12
+  loss: SeqCeCriterion
+  split_names:
+  - train
+  - dev
+  - test
+  task_type: SeqenceLabeling
+

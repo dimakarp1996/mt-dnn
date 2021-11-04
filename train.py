@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import random
+import json
 from datetime import datetime
 from pprint import pprint
 import numpy as np
@@ -26,6 +27,8 @@ def model_config(parser):
     parser.add_argument('--update_bert_opt', default=0, type=int)
     parser.add_argument('--multi_gpu_on', action='store_true')
     parser.add_argument('--mem_cum_type', type=str, default='simple',
+                        help='bilinear/simple/defualt')
+    parser.add_argument('--ckpt_config', type=str, default='pretrained_base_cased/config.json',
                         help='bilinear/simple/defualt')
     parser.add_argument('--answer_num_turn', type=int, default=5)
     parser.add_argument('--answer_mem_drop_p', type=float, default=0.1)
@@ -99,8 +102,8 @@ def train_config(parser):
     parser.add_argument('--save_per_updates', type=int, default=10000)
     parser.add_argument('--save_per_updates_on', action='store_true')
     parser.add_argument('--epochs', type=int, default=5)
-    parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--batch_size_eval', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--batch_size_eval', type=int, default=1)
     parser.add_argument('--optimizer', default='adamax',
                         help='supported optimizer: adamax, sgd, adadelta, adam')
     parser.add_argument('--grad_clipping', type=float, default=0)
@@ -182,6 +185,11 @@ def dump(path, data):
         json.dump(data, f)
 
 def evaluation(model, datasets, data_list, task_defs, output_dir='checkpoints', epoch=0, n_updates=-1, with_label=False, tensorboard=None, glue_format_on=False, test_on=False, device=None, logger=None):
+    print(torch.cuda.max_memory_allocated(0))
+    print(torch.cuda.memory_stats(device))
+    print(torch.cuda.memory_summary(device))
+    print(torch.cuda.memory_snapshot())
+    #assert False
     # eval on rank 1
     print_message(logger, "Evaluation")
     test_prefix = "Test" if test_on else "Dev"
@@ -197,6 +205,8 @@ def evaluation(model, datasets, data_list, task_defs, output_dir='checkpoints', 
         test_data = data_list[idx]
         if test_data is not None:
             with torch.no_grad():
+                import time
+                t=time.time()
                 test_metrics, test_predictions, test_scores, test_golds, test_ids= eval_model(model,
                                                                                 test_data,
                                                                                 metric_meta=task_def.metric_meta,
@@ -204,6 +214,8 @@ def evaluation(model, datasets, data_list, task_defs, output_dir='checkpoints', 
                                                                                 with_label=with_label,
                                                                                 label_mapper=label_dict,
                                                                                 task_type=task_def.task_type)
+                print('Infered for '+str(time.time()-t))
+                #assert False
             for key, val in test_metrics.items():
                 if tensorboard:
                     tensorboard.add_scalar('{}/{}/{}'.format(test_prefix, dataset, key), val, global_step=updates)
@@ -365,6 +377,8 @@ def main():
             encoder_type == EncoderModelType.DEBERTA or \
             encoder_type == EncoderModelType.ELECTRA:
             state_dict = torch.load(init_model, map_location=device)
+            if '.pt' not in init_model:
+                state_dict = {'state': state_dict, 'config': json.load(open(args.ckpt_config,'r'))}
             config = state_dict['config']
         elif encoder_type == EncoderModelType.ROBERTA or encoder_type == EncoderModelType.XLM:
             model_path = '{}/model.pt'.format(init_model)
@@ -433,7 +447,11 @@ def main():
     for epoch in range(0, args.epochs):
         print_message(logger, 'At epoch {}'.format(epoch), level=1)
         start = datetime.now()
-
+        if not epoch:
+            print('Initial eval')
+            evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
+            evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
+        print('Initial eval ended')       
         for i, (batch_meta, batch_data) in enumerate(multi_task_train_data):
             batch_meta, batch_data = Collater.patch_data(device, batch_meta, batch_data)
             task_id = batch_meta['task_id']
@@ -464,7 +482,7 @@ def main():
                 evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
                 print_message(logger, 'Saving mt-dnn model to {}'.format(model_file))
                 model.save(model_file)
-
+        print('eval')
         evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
         evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
         print_message(logger, '[new test scores at {} saved.]'.format(epoch))
@@ -473,6 +491,6 @@ def main():
             model.save(model_file)
     if args.tensorboard:
         tensorboard.close()
-
+    evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, 2, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
 if __name__ == '__main__':
     main()

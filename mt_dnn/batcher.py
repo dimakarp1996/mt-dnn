@@ -435,7 +435,9 @@ class Collater:
         # If we convert object to dict in advance, DataLoader will do nothing
         batch_info['task_def'] = task_def.__dict__ 
         batch_info['pairwise_size'] = self.pairwise_size  # need for ranking task
-
+        for i in range(len(batch)):
+            if 'label' not in batch[i]:
+                batch[i]['label'] = batch[i]['labels']
         # add label
         labels = [sample['label'] for sample in batch]
         task_obj = tasks.get_task_obj(task_def)
