@@ -32,6 +32,17 @@ def main(args):
     logger.info('Loaded {} NER train samples'.format(len(train_data)))
     logger.info('Loaded {} NER dev samples'.format(len(dev_data)))
     logger.info('Loaded {} NER test samples'.format(len(test_data)))
+    bert_root = args.output_dir
+    if not os.path.isdir(bert_root):
+        os.mkdir(bert_root)
+    train_fout = os.path.join(bert_root, 'ner_train.tsv')
+    dev_fout = os.path.join(bert_root, 'ner_dev.tsv')
+    test_fout = os.path.join(bert_root, 'ner_test.tsv')
+
+    dump_rows(train_data, train_fout, DataFormat.Seqence)
+    dump_rows(dev_data, dev_fout, DataFormat.Seqence)
+    dump_rows(test_data, test_fout, DataFormat.Seqence)
+    logger.info('done with NER')
 
     pos_train_data = load_conll_pos(train_path)
     pos_dev_data = load_conll_pos(dev_path)
@@ -47,17 +58,6 @@ def main(args):
     logger.info('Loaded {} POS dev samples'.format(len(chunk_dev_data)))
     logger.info('Loaded {} POS test samples'.format(len(chunk_test_data)))
 
-    bert_root = args.output_dir
-    if not os.path.isdir(bert_root):
-        os.mkdir(bert_root)
-    train_fout = os.path.join(bert_root, 'ner_train.tsv')
-    dev_fout = os.path.join(bert_root, 'ner_dev.tsv')
-    test_fout = os.path.join(bert_root, 'ner_test.tsv')
-
-    dump_rows(train_data, train_fout, DataFormat.Seqence)
-    dump_rows(dev_data, dev_fout, DataFormat.Seqence)
-    dump_rows(test_data, test_fout, DataFormat.Seqence)
-    logger.info('done with NER')
 
     train_fout = os.path.join(bert_root, 'pos_train.tsv')
     dev_fout = os.path.join(bert_root, 'pos_dev.tsv')

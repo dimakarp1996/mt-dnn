@@ -242,7 +242,7 @@ def main(args):
         for split_name in task_def.split_names:
             file_path = os.path.join(root, "%s_%s.tsv" % (task, split_name))
             if not os.path.exists(file_path):
-                logger.warning("File %s doesnot exit")
+                logger.warning(f"File {file_path} doesnot exit")
                 sys.exit(1)
             rows = load_data(file_path, task_def)
             dump_path = os.path.join(mt_dnn_root, "%s_%s.json" % (task, split_name))

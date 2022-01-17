@@ -28,7 +28,7 @@ def model_config(parser):
     parser.add_argument('--multi_gpu_on', action='store_true')
     parser.add_argument('--mem_cum_type', type=str, default='simple',
                         help='bilinear/simple/defualt')
-    parser.add_argument('--ckpt_config', type=str, default='pretrained_base_cased/config.json',
+    parser.add_argument('--ckpt_config', type=str, default='rubert_base_cased/config.json',
                         help='bilinear/simple/defualt')
     parser.add_argument('--answer_num_turn', type=int, default=5)
     parser.add_argument('--answer_mem_drop_p', type=float, default=0.1)
@@ -57,7 +57,7 @@ def model_config(parser):
     parser.add_argument('--num_hidden_layers', type=int, default=-1)
 
     # BERT pre-training
-    parser.add_argument('--bert_model_type', type=str, default='bert-base-uncased')
+    parser.add_argument('--bert_model_type', type=str, default='bert-base-cased')
     parser.add_argument('--do_lower_case', action='store_true')
     parser.add_argument('--masked_lm_prob', type=float, default=0.15)
     parser.add_argument('--short_seq_prob', type=float, default=0.2)
@@ -78,16 +78,16 @@ def model_config(parser):
 
 
 def data_config(parser):
-    parser.add_argument('--log_file', default='mt-dnn-train.log', help='path for log file.')
+    parser.add_argument('--log_file', default='mt-dnn-evseev-train.log', help='path for log file.')
     parser.add_argument('--tensorboard', action='store_true')
     parser.add_argument('--tensorboard_logdir', default='tensorboard_logdir')
-    parser.add_argument("--init_checkpoint", default='mt_dnn_models/bert_model_base_uncased.pt', type=str)
-    parser.add_argument('--data_dir', default='data/canonical_data/bert_uncased_lower')
+    parser.add_argument("--init_checkpoint", default='rubert_base_cased/pytorch_model.bin', type=str)
+    parser.add_argument('--data_dir', default='data/canonical_data/rubert_cased_lower')
     parser.add_argument('--data_sort_on', action='store_true')
     parser.add_argument('--name', default='farmer')
-    parser.add_argument('--task_def', type=str, default="experiments/glue/glue_task_def.yml")
-    parser.add_argument('--train_datasets', default='mnli')
-    parser.add_argument('--test_datasets', default='mnli_matched,mnli_mismatched')
+    parser.add_argument('--task_def', type=str, default="experiments/evseev/evseev_task_def.yml")
+    parser.add_argument('--train_datasets', default='relations,ner')
+    parser.add_argument('--test_datasets', default='relations,ner')
     parser.add_argument('--glue_format_on', action='store_true')
     parser.add_argument('--mkd-opt', type=int, default=0, 
                         help=">0 to turn on knowledge distillation, requires 'softlabel' column in input data")
@@ -185,11 +185,8 @@ def dump(path, data):
         json.dump(data, f)
 
 def evaluation(model, datasets, data_list, task_defs, output_dir='checkpoints', epoch=0, n_updates=-1, with_label=False, tensorboard=None, glue_format_on=False, test_on=False, device=None, logger=None):
-    print(torch.cuda.max_memory_allocated(0))
-    print(torch.cuda.memory_stats(device))
-    print(torch.cuda.memory_summary(device))
-    print(torch.cuda.memory_snapshot())
-    #assert False
+    print(torch.cuda.max_memory_allocated(device))
+    print(torch.cuda.max_memory_reserved(device))
     # eval on rank 1
     print_message(logger, "Evaluation")
     test_prefix = "Test" if test_on else "Dev"
@@ -327,9 +324,7 @@ def main():
     test_data_list = []
     test_collater = Collater(is_train=False, encoder_type=encoder_type, max_seq_len=args.max_seq_len, do_padding=args.do_padding)
     for dataset in args.test_datasets:
-        print(dataset)
         prefix = dataset.split('_')[0]
-        print(prefix)
         task_def = task_defs.get_task_def(prefix)
         task_id = tasks[prefix]
         task_type = task_def.task_type
@@ -422,8 +417,7 @@ def main():
     headline = '############# Model Arch of MT-DNN #############'
     ### print network
     print_message(logger, '\n{}\n{}\n'.format(headline, model.network))
-    print('breakpoint')
-    breakpoint()
+
     # dump config
     config_file = os.path.join(output_dir, 'config.json')
     with open(config_file, 'w', encoding='utf-8') as writer:
@@ -453,7 +447,7 @@ def main():
         if not epoch:
             print('Initial eval')
             evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
-            evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
+            evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger) 
         print('Initial eval ended')       
         for i, (batch_meta, batch_data) in enumerate(multi_task_train_data):
             batch_meta, batch_data = Collater.patch_data(device, batch_meta, batch_data)
@@ -482,18 +476,17 @@ def main():
             if args.save_per_updates_on and ((model.local_updates) % (args.save_per_updates * args.grad_accumulation_step) == 0) and args.local_rank in [-1, 0]:
                 model_file = os.path.join(output_dir, 'model_{}_{}.pt'.format(epoch, model.updates))
                 evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
-                evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
+                evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
                 print_message(logger, 'Saving mt-dnn model to {}'.format(model_file))
                 model.save(model_file)
         print('eval')
         evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
-        evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
+        evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
         print_message(logger, '[new test scores at {} saved.]'.format(epoch))
         if args.local_rank in [-1, 0]:
             model_file = os.path.join(output_dir, 'model_{}.pt'.format(epoch))
             model.save(model_file)
     if args.tensorboard:
         tensorboard.close()
-    evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, 2, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
 if __name__ == '__main__':
     main()

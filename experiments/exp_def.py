@@ -106,7 +106,7 @@ class TaskDefs:
 
     def get_task_def(self, task_name):
         if task_name not in self._task_def_dic:
-            assert task_name in self._task_type_map
+            assert task_name in self._task_type_map,(task_name,self._task_type_map)
             self._task_def_dic[task_name] = TaskDef(
                 self._global_map.get(task_name, None),
                 self._n_class_map[task_name],

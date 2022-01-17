@@ -186,9 +186,9 @@ def dump(path, data):
 
 def evaluation(model, datasets, data_list, task_defs, output_dir='checkpoints', epoch=0, n_updates=-1, with_label=False, tensorboard=None, glue_format_on=False, test_on=False, device=None, logger=None):
     print(torch.cuda.max_memory_allocated(0))
-    print(torch.cuda.memory_stats(device))
-    print(torch.cuda.memory_summary(device))
-    print(torch.cuda.memory_snapshot())
+    #print(torch.cuda.memory_stats(device))
+    #print(torch.cuda.memory_summary(device))
+    #print(torch.cuda.memory_snapshot())
     #assert False
     # eval on rank 1
     print_message(logger, "Evaluation")
@@ -327,9 +327,7 @@ def main():
     test_data_list = []
     test_collater = Collater(is_train=False, encoder_type=encoder_type, max_seq_len=args.max_seq_len, do_padding=args.do_padding)
     for dataset in args.test_datasets:
-        print(dataset)
         prefix = dataset.split('_')[0]
-        print(prefix)
         task_def = task_defs.get_task_def(prefix)
         task_id = tasks[prefix]
         task_type = task_def.task_type
@@ -422,8 +420,7 @@ def main():
     headline = '############# Model Arch of MT-DNN #############'
     ### print network
     print_message(logger, '\n{}\n{}\n'.format(headline, model.network))
-    print('breakpoint')
-    breakpoint()
+
     # dump config
     config_file = os.path.join(output_dir, 'config.json')
     with open(config_file, 'w', encoding='utf-8') as writer:
@@ -452,8 +449,7 @@ def main():
         start = datetime.now()
         if not epoch:
             print('Initial eval')
-            evaluation(model, args.test_datasets, dev_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=True, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=False, device=device, logger=logger)
-            evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, n_updates=args.save_per_updates, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)
+            evaluation(model, args.test_datasets, test_data_list, task_defs, output_dir, epoch, with_label=False, tensorboard=tensorboard, glue_format_on=args.glue_format_on, test_on=True, device=device, logger=logger)  
         print('Initial eval ended')       
         for i, (batch_meta, batch_data) in enumerate(multi_task_train_data):
             batch_meta, batch_data = Collater.patch_data(device, batch_meta, batch_data)

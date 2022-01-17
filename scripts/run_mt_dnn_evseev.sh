@@ -1,5 +1,5 @@
 
-prefix="mt-dnn-evseevnerbywords"
+prefix="mt-dnn-evseev"
 BATCH_SIZE=8
 gpu=8
 echo "export CUDA_VISIBLE_DEVICES=${gpu}"
@@ -10,7 +10,7 @@ train_datasets="ner,relations"
 test_datasets="ner,relations"
 MODEL_ROOT="checkpoints"
 BERT_PATH="rubert_base_cased/pytorch_model.bin"
-DATA_DIR="rubert_base_cased/data_bywords"
+DATA_DIR="rubert_base_cased/data_mt_preproc"
 config="rubert_base_cased/config.json"
 answer_opt=1
 optim="adamax"
@@ -20,4 +20,4 @@ lr="5e-5"
 
 model_dir="checkpoints/${prefix}_${optim}_answer_opt${answer_opt}_gc${grad_clipping}_ggc${global_grad_clipping}_${tstr}"
 log_file="${model_dir}/log.log"
-python trainevseev.py --data_dir ${DATA_DIR} --init_checkpoint ${BERT_PATH} --batch_size ${BATCH_SIZE} --output_dir ${model_dir} --log_file ${log_file} --answer_opt ${answer_opt} --optimizer ${optim} --train_datasets ${train_datasets} --test_datasets ${test_datasets} --grad_clipping ${grad_clipping} --global_grad_clipping ${global_grad_clipping} --learning_rate ${lr} --multi_gpu_on --ckpt_config ${config} --batch_size_eval 1 --grad_accumulation_step 4 --epochs 3 --task_def "rubert_base_cased/evseev_task_def.yml"
+python trainevseev.py --data_dir ${DATA_DIR} --init_checkpoint ${BERT_PATH} --batch_size ${BATCH_SIZE} --output_dir ${model_dir} --log_file ${log_file} --answer_opt ${answer_opt} --optimizer ${optim} --train_datasets ${train_datasets} --test_datasets ${test_datasets} --grad_clipping ${grad_clipping} --global_grad_clipping ${global_grad_clipping} --learning_rate ${lr} --multi_gpu_on --ckpt_config ${config} --batch_size_eval 1 --grad_accumulation_step 4 --epochs 15 --task_def "rubert_base_cased/evseev_task_def.yml"
