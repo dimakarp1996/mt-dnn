@@ -427,7 +427,10 @@ def main():
                 encoding = extract_encoding(model, test_data, use_cuda=args.cuda)
             torch.save(encoding, os.path.join(output_dir, '{}_encoding.pt'.format(dataset)))
         return
-
+    for name, param in model.named_parameters():
+        print(name)
+        print(param)
+    breakpoint() 
     for epoch in range(0, args.epochs):
         print_message(logger, 'At epoch {}'.format(epoch), level=1)
         start = datetime.now()
