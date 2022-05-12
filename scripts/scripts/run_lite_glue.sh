@@ -1,6 +1,6 @@
 #!/bin/bash
 prefix="mt-dnn-lite-glue"
-BATCH_SIZE=8
+BATCH_SIZE=16
 gpu=$1
 echo "export CUDA_VISIBLE_DEVICES=${gpu}"
 export CUDA_VISIBLE_DEVICES=${gpu}
