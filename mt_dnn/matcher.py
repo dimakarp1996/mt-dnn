@@ -60,6 +60,7 @@ class SANBertNetwork(nn.Module):
         # create output header
         self.scoring_list = nn.ModuleList()
         self.dropout_list = nn.ModuleList()
+        self.classifier = SANClassifier(hidden_size, hidden_size, lab, opt, prefix='answer', dropout=dropout)
         for task_id in range(len(task_def_list)):
             task_def: TaskDef = task_def_list[task_id]
             lab = task_def.n_class
@@ -92,7 +93,8 @@ class SANBertNetwork(nn.Module):
                 out_proj = None
             else:
                 if decoder_opt == 1:
-                    out_proj = SANClassifier(hidden_size, hidden_size, lab, opt, prefix='answer', dropout=dropout)
+                    task_specific_key, task_specific_query, task_specific_value = None, None, None
+                    out_proj = ((task_specific_key, task_specific_query, task_specific_value)) 
                 else:
                     out_proj = nn.Linear(hidden_size, lab)
             self.scoring_list.append(out_proj)
@@ -184,7 +186,8 @@ class SANBertNetwork(nn.Module):
                 assert premise_mask is not None
                 assert hyp_mask is not None
                 hyp_mem = last_hidden_state[:, :max_query, :]
-                logits = self.scoring_list[task_id](last_hidden_state, hyp_mem, premise_mask, hyp_mask)
+                task_specific_key_query_value = self.scoring_list[task_id]
+                logits = self.classifier(last_hidden_state, hyp_mem, premise_mask, hyp_mask, task_specific_key_query_value)
             else:
                 pooled_output = self.dropout_list[task_id](pooled_output)
                 logits = self.scoring_list[task_id](pooled_output)
