@@ -20,6 +20,7 @@ mnli:
   - entailment
   metric_meta:
   - ACC
+  - F1
   loss: CeCriterion
   kd_loss: MseCriterion
   adv_loss: SymKlCriterion
@@ -74,6 +75,7 @@ rte:
   - entailment
   metric_meta:
   - ACC
+  - F1
   loss: CeCriterion
   kd_loss: MseCriterion
   adv_loss: SymKlCriterion
@@ -111,6 +113,7 @@ sst:
   enable_san: false
   metric_meta:
   - ACC
+  - F1
   loss: CeCriterion
   kd_loss: MseCriterion
   adv_loss: SymKlCriterion
@@ -132,6 +135,7 @@ wnli:
   enable_san: false 
   metric_meta:
   - ACC
+  - F1
   loss: CeCriterion
   kd_loss: MseCriterion
   adv_loss: SymKlCriterion

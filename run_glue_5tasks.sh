@@ -1,9 +1,6 @@
 #!/bin/bash
-prefix="mt-dnn-lite-glue-custom2"
+prefix="mt-dnn-lite-glue-5task"
 BATCH_SIZE=32
-gpu=$1
-echo "export CUDA_VISIBLE_DEVICES=${gpu}"
-export CUDA_VISIBLE_DEVICES=${gpu}
 tstr=$(date +"%FT%H%M")
 
 train_datasets="rte,qnli,mrpc,sst,cola"
@@ -13,7 +10,7 @@ BERT_PATH="mt_dnn_models/bert_model_base_uncased.pt"
 DATA_DIR="data/canonical_data/bert_uncased_lower"
 
 answer_opt=1
-optim="adamw"
+optim="adam"
 grad_clipping=0
 global_grad_clipping=1
 lr="2e-5"
