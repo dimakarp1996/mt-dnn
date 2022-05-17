@@ -61,6 +61,7 @@ class SANMultiClassifier(nn.Module):
         super(SANMultiClassifier, self).__init__()
         for _ in range(5):
             print('use MULTI CLASSIFIER CUSTOM')
+        self.dropout = opt.get('dropout',sum(dropouts)/len(dropouts))
         self.prefix = prefix
         self.query_wsum = SelfAttnWrapper(x_size, prefix='mem_cum', opt=opt, dropout=self.dropout)
         self.attn = FlatSimilarityWrapper(x_size, h_size, prefix, opt, self.dropout)
