@@ -58,7 +58,9 @@ class SANMultiClassifier(nn.Module):
     https://arxiv.org/abs/1804.07888
     """
     def __init__(self, x_size, h_size, label_sizes, opt={}, prefix='decoder', dropouts=[None]):
-        super(SANClassifier, self).__init__()
+        super(SANMultiClassifier, self).__init__()
+        for _ in range(5):
+            print('use MULTI CLASSIFIER CUSTOM')
         self.prefix = prefix
         self.query_wsum = SelfAttnWrapper(x_size, prefix='mem_cum', opt=opt, dropout=self.dropout)
         self.attn = FlatSimilarityWrapper(x_size, h_size, prefix, opt, self.dropout)
@@ -126,6 +128,8 @@ class SANClassifier(nn.Module):
     """
     def __init__(self, x_size, h_size, label_size, opt={}, prefix='decoder', dropout=None):
         super(SANClassifier, self).__init__()
+        for _ in range(5):
+            print('USE PLAIN CLASSIFIER')
         if dropout is None:
             self.dropout = DropoutWrapper(opt.get('{}_dropout_p'.format(self.prefix), 0))
         else:

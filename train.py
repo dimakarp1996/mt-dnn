@@ -152,7 +152,7 @@ def train_config(parser):
     parser.add_argument('--adv_epsilon', default=1e-6, type=float)
     parser.add_argument('--encode_mode', action='store_true', help="only encode test data")
     parser.add_argument('--debug', action='store_true', help="print debug info")
-    parser.add_argument('--custom',action='store_false')
+    parser.add_argument('--custom',default=False)
 
     # transformer cache
     parser.add_argument("--transformer_cache", default='.cache', type=str)
