@@ -20,7 +20,6 @@ mnli:
   - entailment
   metric_meta:
   - ACC
-  - F1
   loss: CeCriterion
   kd_loss: MseCriterion
   adv_loss: SymKlCriterion

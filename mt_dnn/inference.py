@@ -80,6 +80,7 @@ def eval_model(model, data, metric_meta, device, with_label=True, label_mapper=N
     metrics = {}
     for (batch_info, batch_data) in tqdm(data, total=len(data)):
         batch_info, batch_data = Collater.patch_data(device, batch_info, batch_data)
+        #print('prediction')
         score, pred, gold = model.predict(batch_info, batch_data)
         scores = merge(score, scores)
         golds = merge(gold, golds)

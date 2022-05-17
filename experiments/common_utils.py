@@ -22,6 +22,9 @@ def dump_rows(rows, out_path, data_format):
                 out_f.write("%s\t%s\t%s\n" % (row["uid"], row["label"], row["premise"]))
             elif data_format == DataFormat.PremiseAndOneHypothesis:
                 for col in ["uid", "label", "premise", "hypothesis"]:
+                    if col not in row:
+                        print(f'WARNING {col} not found. Default as empty')
+                        row[col] = ''
                     if "\t" in str(row[col]):
                         import pdb; pdb.set_trace()
                 out_f.write("%s\t%s\t%s\t%s\n" % (row["uid"], row["label"], row["premise"], row["hypothesis"]))

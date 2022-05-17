@@ -11,7 +11,7 @@ TASK_CLASS_NAMES = set()
 class MTDNNTask:
     def __init__(self, task_def):
         self._task_def = task_def
-
+        # print(self._task_def)
     def input_parse_label(self, label: str):
         raise NotImplementedError()
 
@@ -40,12 +40,15 @@ class MTDNNTask:
     @staticmethod
     def train_forward(sequence_output, pooled_output, premise_mask, hyp_mask, decoder_opt, dropout_layer, task_layer):
         if decoder_opt == 1:
-            max_query = hyp_mask.size(1)
-            assert max_query > 0
-            assert premise_mask is not None
+            assert premise_mask is not None,breakpoint()
             assert hyp_mask is not None
+            max_query = premise_mask.size(1)
+            assert max_query > 0
             hyp_mem = sequence_output[:, :max_query, :]
+            # print(task_layer)
             logits = task_layer(sequence_output, hyp_mem, premise_mask, hyp_mask)
+            assert not torch.isnan(logits).any(), breakpoint()
+
         else:
             pooled_output = dropout_layer(pooled_output)
             logits = task_layer(pooled_output)

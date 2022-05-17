@@ -152,6 +152,7 @@ def train_config(parser):
     parser.add_argument('--adv_epsilon', default=1e-6, type=float)
     parser.add_argument('--encode_mode', action='store_true', help="only encode test data")
     parser.add_argument('--debug', action='store_true', help="print debug info")
+    parser.add_argument('--custom',action='store_false')
 
     # transformer cache
     parser.add_argument("--transformer_cache", default='.cache', type=str)
@@ -395,7 +396,7 @@ def main():
 
     opt.update(config)
 
-    model = MTDNNModel(opt, device=device, state_dict=state_dict, num_train_step=num_all_batches)
+    model = MTDNNModel(opt, device=device, state_dict=state_dict, num_train_step=num_all_batches,custom=args.custom)
     if args.resume and args.model_ckpt:
         print_message(logger, 'loading model from {}'.format(args.model_ckpt))
         model.load(args.model_ckpt)
@@ -427,10 +428,10 @@ def main():
                 encoding = extract_encoding(model, test_data, use_cuda=args.cuda)
             torch.save(encoding, os.path.join(output_dir, '{}_encoding.pt'.format(dataset)))
         return
-    for name, param in model.named_parameters():
-        print(name)
-        print(param)
-    breakpoint() 
+    # for name, param in model.named_parameters():
+    #    print(name)
+    #    print(param)
+    #breakpoint() 
     for epoch in range(0, args.epochs):
         print_message(logger, 'At epoch {}'.format(epoch), level=1)
         start = datetime.now()

@@ -1,10 +1,10 @@
 #!/bin/bash
-prefix="mt-dnn-lite-glue-5task-san"
+prefix="mt-dnn-lite-glue-5othertask-san"
 BATCH_SIZE=32
 tstr=$(date +"%FT%H%M")
 
-train_datasets="rte,qnli,mrpc,sst,cola"
-test_datasets="rte,qnli,mrpc,sst,cola"
+train_datasets="rte,qnli,mrpc,mnli,qqp"
+test_datasets="rte,qnli,mrpc,mnli_matched,mnli_mismatched"
 MODEL_ROOT="checkpoints"
 BERT_PATH="mt_dnn_models/bert_model_base_uncased.pt"
 DATA_DIR="data/canonical_data/bert_uncased_lower"

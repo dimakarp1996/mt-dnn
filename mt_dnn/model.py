@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class MTDNNModel(object):
-    def __init__(self, opt, device=None, state_dict=None, num_train_step=-1):
+    def __init__(self, opt, device=None, state_dict=None, num_train_step=-1,custom=False):
         self.config = opt
         self.updates = state_dict['updates'] if state_dict and 'updates' in state_dict else 0
         self.local_updates = 0
@@ -36,7 +36,7 @@ class MTDNNModel(object):
         self.emb_val =  AverageMeter()
         self.eff_perturb = AverageMeter()
         self.initial_from_local = True if state_dict else False
-        model = SANBertNetwork(opt, initial_from_local=self.initial_from_local)
+        model = SANBertNetwork(opt, initial_from_local=self.initial_from_local,custom=custom)
         self.total_param = sum([p.nelement() for p in model.parameters() if p.requires_grad])
         if opt['cuda']:
             if self.config['local_rank'] != -1:

@@ -49,7 +49,76 @@ class Classifier(nn.Module):
             x = torch.cat([x1, x2], 1)
         x = self.dropout(x)
         scores = self.proj(x)
+        assert not torch.isnan(scores).any(), breakpoint()
         return scores
+
+
+class SANMultiClassifier(nn.Module):
+    """Implementation of Stochastic Answer Networks for Natural Language Inference, Xiaodong Liu, Kevin Duh and Jianfeng Gao
+    https://arxiv.org/abs/1804.07888
+    """
+    def __init__(self, x_size, h_size, label_sizes, opt={}, prefix='decoder', dropouts=[None]):
+        super(SANClassifier, self).__init__()
+        self.prefix = prefix
+        self.query_wsum = SelfAttnWrapper(x_size, prefix='mem_cum', opt=opt, dropout=self.dropout)
+        self.attn = FlatSimilarityWrapper(x_size, h_size, prefix, opt, self.dropout)
+        self.rnn_type = '{}{}'.format(opt.get('{}_rnn_type'.format(prefix), 'gru').upper(), 'Cell')
+        self.rnn =getattr(nn, self.rnn_type)(x_size, h_size)
+        self.num_turn = opt.get('{}_num_turn'.format(prefix), 5)
+        self.opt = opt
+        self.mem_random_drop = opt.get('{}_mem_drop_p'.format(prefix), 0)
+        self.mem_type = opt.get('{}_mem_type'.format(prefix), 0)
+        self.weight_norm_on = opt.get('{}_weight_norm_on'.format(prefix), False)
+        self.dump_state = opt.get('dump_state_on', False)
+        self.alpha = Parameter(torch.zeros(1, 1), requires_grad=False)
+        if self.weight_norm_on:
+            self.rnn = WN(self.rnn)
+
+        self.classifiers = []
+        self.hidden_states = None
+        for dropout, label_size in zip(dropouts, label_sizes):
+            self.classifiers.append(Classifier(x_size, label_size, opt, prefix=prefix, dropout=dropout))
+            
+
+    def forward(self, x, h0, task_id, x_mask=None, h_mask=None):
+        assert len(h0.shape) == 2, h0.shape
+        if self.hidden_states is None:
+            self.hidden_states = torch.randn_like((h0.shape[0],len(self.classifiers),h0.shape[1]))
+        h0 = h0 + self.hidden_states[:,task_id,:]
+        h0 = self.query_wsum(h0, h_mask)
+        if type(self.rnn) is nn.LSTMCell:
+            c0 = h0.new(h0.size()).zero_()
+        scores_list = []
+        for turn in range(self.num_turn):
+            att_scores = self.attn(x, h0, x_mask)
+            x_sum = torch.bmm(F.softmax(att_scores, 1).unsqueeze(1), x).squeeze(1)
+            scores = self.classifiers[task_id](x_sum, h0)
+            scores_list.append(scores)
+            # next turn
+            if self.rnn is not None:
+                h0 = self.dropout(h0)
+                if type(self.rnn) is nn.LSTMCell:
+                    h0, c0 = self.rnn(x_sum, (h0, c0))
+                else:
+                    h0 = self.rnn(x_sum, h0)
+        if self.mem_type == 1:
+            mask = generate_mask(self.alpha.data.new(x.size(0), self.num_turn), self.mem_random_drop, self.training)
+            mask = [m.contiguous() for m in torch.unbind(mask, 1)]
+            tmp_scores_list = [mask[idx].view(x.size(0), 1).expand_as(inp) * F.softmax(inp, 1) for idx, inp in enumerate(scores_list)]
+            scores = torch.stack(tmp_scores_list, 2)
+            scores = torch.mean(scores, 2)
+            scores = torch.log(scores)
+            assert not torch.isnan(scores).any(), breakpoint()
+
+        else:
+            scores = scores_list[-1]
+        if self.dump_state:
+            return scores, scores_list
+        else:
+            return scores
+
+
+
 
 class SANClassifier(nn.Module):
     """Implementation of Stochastic Answer Networks for Natural Language Inference, Xiaodong Liu, Kevin Duh and Jianfeng Gao
@@ -103,6 +172,8 @@ class SANClassifier(nn.Module):
             scores = torch.stack(tmp_scores_list, 2)
             scores = torch.mean(scores, 2)
             scores = torch.log(scores)
+            assert not torch.isnan(scores).any(), breakpoint()
+
         else:
             scores = scores_list[-1]
         if self.dump_state:
