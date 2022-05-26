@@ -41,8 +41,12 @@ class Classifier(nn.Module):
 
         if self.weight_norm_on:
             self.proj = weight_norm(self.proj)
+        self.proj = self.proj.cuda()
 
     def forward(self, x1, x2, mask=None):
+        assert not torch.isnan(x1).any(), breakpoint()
+        assert not torch.isnan(x2).any(), breakpoint()
+
         if self.merge_opt == 1:
             x = torch.cat([x1, x2, (x1 - x2).abs(), x1 * x2], 1)
         else:
@@ -61,16 +65,17 @@ class SANMultiClassifier(nn.Module):
         super(SANMultiClassifier, self).__init__()
         for _ in range(5):
             print('use MULTI CLASSIFIER CUSTOM')
-        self.dropout = opt.get('dropout',sum(dropouts)/len(dropouts))
+        self.dropout = DropoutWrapper(opt.get('{}_dropout_p'.format(prefix), 0))
         self.prefix = prefix
-        self.query_wsum = SelfAttnWrapper(x_size, prefix='mem_cum', opt=opt, dropout=self.dropout)
-        self.attn = FlatSimilarityWrapper(x_size, h_size, prefix, opt, self.dropout)
+        self.query_wsum = SelfAttnWrapper(x_size, prefix='mem_cum', opt=opt, dropout=self.dropout).cuda()
+        self.attn = FlatSimilarityWrapper(x_size, h_size, prefix, opt, self.dropout).cuda()
         self.rnn_type = '{}{}'.format(opt.get('{}_rnn_type'.format(prefix), 'gru').upper(), 'Cell')
-        self.rnn =getattr(nn, self.rnn_type)(x_size, h_size)
+        self.rnn =getattr(nn, self.rnn_type)(x_size, h_size).cuda()
         self.num_turn = opt.get('{}_num_turn'.format(prefix), 5)
         self.opt = opt
         self.mem_random_drop = opt.get('{}_mem_drop_p'.format(prefix), 0)
         self.mem_type = opt.get('{}_mem_type'.format(prefix), 0)
+        self.MAX_LEN = 192
         self.weight_norm_on = opt.get('{}_weight_norm_on'.format(prefix), False)
         self.dump_state = opt.get('dump_state_on', False)
         self.alpha = Parameter(torch.zeros(1, 1), requires_grad=False)
@@ -80,21 +85,38 @@ class SANMultiClassifier(nn.Module):
         self.classifiers = []
         self.hidden_states = None
         for dropout, label_size in zip(dropouts, label_sizes):
-            self.classifiers.append(Classifier(x_size, label_size, opt, prefix=prefix, dropout=dropout))
+            self.classifiers.append(Classifier(x_size, label_size, opt, prefix=prefix,
+                                      dropout=DropoutWrapper(dropout)))
             
 
-    def forward(self, x, h0, task_id, x_mask=None, h_mask=None):
-        assert len(h0.shape) == 2, h0.shape
+    def forward(self, x, h0, x_mask=None, h_mask=None,task_id=None):
+        assert not torch.isnan(x).any(), breakpoint()
+        assert not torch.isnan(h0).any(), breakpoint()
+        alpha = 0.9
+        assert len(h0.shape) == 3, h0.shape
+        h0_old= h0
         if self.hidden_states is None:
-            self.hidden_states = torch.randn_like((h0.shape[0],len(self.classifiers),h0.shape[1]))
-        h0 = h0 + self.hidden_states[:,task_id,:]
-        h0 = self.query_wsum(h0, h_mask)
+            self.hidden_states = nn.Embedding(len(self.classifiers),h0.shape[2]*self.MAX_LEN).cuda()
+        task_id_tensor = torch.Tensor([task_id]).long().cuda()
+        task_specific_emb = self.hidden_states(task_id_tensor).reshape((1,self.MAX_LEN,h0.shape[2]))
+        #breakpoint()
+        task_specific_emb = task_specific_emb.expand(h0.shape[0],-1,-1)[:,:h0.shape[1],:]
+        h0 = alpha*h0_old + (1-alpha)*task_specific_emb
+        h0_1 = self.query_wsum(h0, h_mask)
+        if type(self.rnn) is nn.LSTMCell:
+            c0 = h0_1.new(h0_1.size()).zero_()
+            assert not torch.isnan(c0).any(), breakpoint()
+        assert not torch.isnan(h0_1).any(), breakpoint()
+        h0 = h0_1
+        assert not torch.isnan(h0).any(), breakpoint()
+
         if type(self.rnn) is nn.LSTMCell:
             c0 = h0.new(h0.size()).zero_()
         scores_list = []
         for turn in range(self.num_turn):
             att_scores = self.attn(x, h0, x_mask)
             x_sum = torch.bmm(F.softmax(att_scores, 1).unsqueeze(1), x).squeeze(1)
+            assert not torch.isnan(x_sum).any(), breakpoint()
             scores = self.classifiers[task_id](x_sum, h0)
             scores_list.append(scores)
             # next turn
@@ -102,6 +124,9 @@ class SANMultiClassifier(nn.Module):
                 h0 = self.dropout(h0)
                 if type(self.rnn) is nn.LSTMCell:
                     h0, c0 = self.rnn(x_sum, (h0, c0))
+                    assert not torch.isnan(h0).any(), breakpoint()
+                    assert not torch.isnan(c0).any(), breakpoint()
+
                 else:
                     h0 = self.rnn(x_sum, h0)
         if self.mem_type == 1:
@@ -154,9 +179,15 @@ class SANClassifier(nn.Module):
         self.classifier = Classifier(x_size, self.label_size, opt, prefix=prefix, dropout=self.dropout)
 
     def forward(self, x, h0, x_mask=None, h_mask=None):
-        h0 = self.query_wsum(h0, h_mask)
+        assert not torch.isnan(x).any(), breakpoint()
+        assert not torch.isnan(h0).any(), breakpoint()
+
+        h0_1 = self.query_wsum(h0, h_mask)
         if type(self.rnn) is nn.LSTMCell:
-            c0 = h0.new(h0.size()).zero_()
+            c0 = h0_1.new(h0_1.size()).zero_()
+            assert not torch.isnan(c0).any(), breakpoint()
+        assert not torch.isnan(h0_1).any(), breakpoint()
+        h0 = h0_1
         scores_list = []
         for turn in range(self.num_turn):
             att_scores = self.attn(x, h0, x_mask)

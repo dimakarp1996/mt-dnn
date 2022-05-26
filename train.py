@@ -397,10 +397,11 @@ def main():
     opt.update(config)
 
     model = MTDNNModel(opt, device=device, state_dict=state_dict, num_train_step=num_all_batches,custom=args.custom)
+    breakpoint()
     if args.resume and args.model_ckpt:
         print_message(logger, 'loading model from {}'.format(args.model_ckpt))
         model.load(args.model_ckpt)
-
+    breakpoint()
     #### model meta str
     headline = '############# Model Arch of MT-DNN #############'
     ### print network

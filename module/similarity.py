@@ -244,9 +244,15 @@ class LinearSelfAttn(nn.Module):
         x = self.dropout(x)
         x_flat = x.contiguous().view(-1, x.size(-1))
         scores = self.linear(x_flat).view(x.size(0), x.size(1))
+        assert not torch.isnan(scores).any(), breakpoint()
+        for i in range(len(x_mask)):
+            assert sum(x_mask[i])<len(x_mask[i]),breakpoint()
         scores.data.masked_fill_(x_mask.data, -float('inf'))
         alpha = F.softmax(scores, 1)
-        return alpha.unsqueeze(1).bmm(x).squeeze(1)
+        assert not torch.isnan(alpha).any(), breakpoint()
+        ans = alpha.unsqueeze(1).bmm(x).squeeze(1)
+        assert not torch.isnan(ans).any(), breakpoint()
+        return ans
 
 
 class MLPSelfAttn(nn.Module):
@@ -268,9 +274,13 @@ class MLPSelfAttn(nn.Module):
         x = self.dropout(x)
         x_flat = x.contiguous().view(-1, x.size(-1))
         scores = self.linear(self.f(self.FC(x_flat))).view(x.size(0), x.size(1))
+        assert not torch.isnan(scores).any(), breakpoint()
         scores.data.masked_fill_(x_mask.data, -float('inf'))
         alpha = F.softmax(scores)
-        return alpha.unsqueeze(1).bmm(x).squeeze(1)
+        assert not torch.isnan(alpha).any(), breakpoint()        
+        ans = alpha.unsqueeze(1).bmm(x).squeeze(1)
+        assert not torch.isnan(ans).any(), breakpoint()
+        return ans
 
 
 class SelfAttnWrapper(nn.Module):

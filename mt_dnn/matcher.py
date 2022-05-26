@@ -13,6 +13,7 @@ from data_utils.task_def import EncoderModelType, TaskType
 import tasks
 from experiments.exp_def import TaskDef
 
+classifier=None
 
 def generate_decoder_opt(enable_san, max_opt):
     print('generate decoder opt')
@@ -22,12 +23,24 @@ def generate_decoder_opt(enable_san, max_opt):
     print(opt_v)
     return opt_v
 
+class ClassifyWrapper(nn.Module):
+    def __init__(self,task_id):
+        super().__init__()
+        self.task_id = task_id
+
+    def forward(self, *args,**kwargs):
+        global classifier
+        return classifier(*args,**kwargs,task_id=self.task_id)
+
+
 
 class SANBertNetwork(nn.Module):
     def __init__(self, opt, bert_config=None, initial_from_local=False,custom=False):
         super(SANBertNetwork, self).__init__()
+        global classifier
         self.dropout_list = nn.ModuleList()
         self.custom = custom
+        # assert self.custom,breakpoint()
         if opt["encoder_type"] not in EncoderModelType._value2member_map_:
             raise ValueError("encoder_type is out of pre-defined types")
         self.encoder_type = opt["encoder_type"]
@@ -71,7 +84,7 @@ class SANBertNetwork(nn.Module):
         self.dropout_list = nn.ModuleList()
         if self.custom:
             print('USING CUSTOM MODE')
-            self.classifier = SANMultiClassifier(
+            classifier = SANMultiClassifier(
                         hidden_size,
                         hidden_size,
                         [k.n_class for k in task_def_list],
@@ -79,7 +92,7 @@ class SANBertNetwork(nn.Module):
                         prefix="answer",
                         dropouts=[opt["dropout_p"] if k.dropout_p is None else k.dropout_p
                                   for k in task_def_list]
-                    )
+                    ).cuda()
         for task_id in range(len(task_def_list)):
             task_def: TaskDef = task_def_list[task_id]
             lab = task_def.n_class
@@ -96,9 +109,12 @@ class SANBertNetwork(nn.Module):
                 self.pooler = Pooler(
                     hidden_size, dropout_p=opt["dropout_p"], actf=opt["pooler_actf"]
                 )
-                out_proj = task_obj.train_build_task_layer(
-                    decoder_opt, hidden_size, lab, opt, prefix="answer", dropout=dropout
-                )
+                if not self.custom:
+                    # breakpoint()
+                    out_proj = task_obj.train_build_task_layer(
+                    decoder_opt, hidden_size, lab, opt, prefix="answer", dropout=dropout)
+                elif self.custom:
+                    out_proj=ClassifyWrapper(task_id)
             elif task_type == TaskType.Span:
                 assert decoder_opt != 1
                 out_proj = nn.Linear(hidden_size, 2)
@@ -130,14 +146,19 @@ class SANBertNetwork(nn.Module):
                             lab,
                             opt,
                             prefix="answer",
-                            dropout=dropout,
+                            dropout=dropout
                         )
+                        breakpoint()
                     else:
                         print('Adding custom function')
-                        out_proj=lambda x: self.classifier(x)
+                        out_proj=ClassifyWrapper(task_id)
                 else:
                     out_proj = nn.Linear(hidden_size, lab)
-            self.scoring_list.append(out_proj)
+            try:
+                self.scoring_list.append(out_proj)
+            except Exception as e:
+                print(e)
+                breakpoint()
         self.config = opt
 
     def embed_encode(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -223,13 +244,15 @@ class SANBertNetwork(nn.Module):
         task_obj = tasks.get_task_obj(self.task_def_list[task_id])
         if task_obj is not None:
             if premise_mask ==None:
-                print('NO PREMISE MASK')
-                breakpoint()
-                premise_mask = ((attention_mask) < 0)
-                hyp_mask = attention_mask <= 5
+                # print('NO PREMISE MASK')
+                # breakpoint()
+                premise_mask = (attention_mask) < 1 # false only where 1
+                hyp_mask = attention_mask > 5
             pooled_output = self.pooler(last_hidden_state)
             # print(self.task_def_list[task_id])
             # breakpoint()
+            for i in range(len(premise_mask)):
+                assert (premise_mask[i]).sum()<len(premise_mask[i]), breakpoint()
             logits = task_obj.train_forward(
                 last_hidden_state,
                 pooled_output,
@@ -278,6 +301,8 @@ class SANBertNetwork(nn.Module):
             return logits
         else:
             if decoder_opt == 1:
+                for i in range(len(premise_mask)):
+                    assert (premise_mask[i]).sum()<len(premise_mask[i]), breakpoint()
                 max_query = hyp_mask.size(1)
                 assert max_query > 0
                 assert premise_mask is not None
