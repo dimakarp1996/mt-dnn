@@ -4,6 +4,7 @@ import numpy as np
 from data_utils.task_def import TaskType, DataFormat
 import tasks
 
+
 def load_data(file_path, task_def):
     data_format = task_def.data_type
     task_type = task_def.task_type
@@ -23,20 +24,33 @@ def load_data(file_path, task_def):
                 "uid": fields[0],
                 "label": fields[1],
                 "premise": fields[2],
-                "hypothesis": fields[3]}
+                "hypothesis": fields[3],
+            }
         elif data_format == DataFormat.PremiseAndMultiHypothesis:
             assert len(fields) > 5
-            row = {"uid": fields[0], "ruid": fields[1].split(","), "label": fields[2], "premise": fields[3],
-                   "hypothesis": fields[4:]}
-        elif data_format == DataFormat.Seqence:
-            row = {"uid": fields[0], "label": eval(fields[1]),  "premise": eval(fields[2])}
-
-        elif data_format == DataFormat.MRC:
             row = {
                 "uid": fields[0],
-                "label": fields[1],
-                "premise": fields[2],
-                "hypothesis": fields[3]}
+                "ruid": fields[1].split(","),
+                "label": fields[2],
+                "premise": fields[3],
+                "hypothesis": fields[4:],
+            }
+        elif data_format == DataFormat.Seqence:
+            row = {
+                "uid": fields[0],
+                "label": eval(fields[1]),
+                "premise": eval(fields[2]),
+            }
+
+        elif data_format == DataFormat.ClozeChoice:
+            row = {
+                "uid": fields[0],
+                "choice": fields[1],
+                "answer": fields[2],
+                "label": fields[3],
+                "premise": fields[4],
+                "hypothesis": fields[5:],
+            }
         else:
             raise ValueError(data_format)
 
@@ -56,19 +70,27 @@ def load_data(file_path, task_def):
         elif task_type == TaskType.SeqenceLabeling:
             assert type(row["label"]) is list
             row["label"] = [label_dict[label] for label in row["label"]]
-
+        elif task_type == TaskType.ClozeChoice:
+            labels = eval(row["label"])
+            row["label"] = int(np.argmax(labels))
+            row["olabel"] = labels
         rows.append(row)
     return rows
+
 
 def load_score_file(score_path, n_class):
     sample_id_2_pred_score_seg_dic = {}
     score_obj = json.loads(open(score_path, encoding="utf-8").read())
-    assert (len(score_obj["scores"]) % len(score_obj["uids"]) == 0) and \
-           (len(score_obj["scores"]) / len(score_obj["uids"]) == n_class), \
-        "scores column size should equal to sample count or multiple of sample count (for classification problem)"
+    assert (len(score_obj["scores"]) % len(score_obj["uids"]) == 0) and (
+        len(score_obj["scores"]) / len(score_obj["uids"]) == n_class
+    ), "scores column size should equal to sample count or multiple of sample count (for classification problem)"
 
     scores = score_obj["scores"]
-    score_segs = [scores[i * n_class: (i+1) * n_class] for i in range(len(score_obj["uids"]))]
-    for sample_id, pred, score_seg in zip(score_obj["uids"], score_obj["predictions"], score_segs):
+    score_segs = [
+        scores[i * n_class : (i + 1) * n_class] for i in range(len(score_obj["uids"]))
+    ]
+    for sample_id, pred, score_seg in zip(
+        score_obj["uids"], score_obj["predictions"], score_segs
+    ):
         sample_id_2_pred_score_seg_dic[sample_id] = (pred, score_seg)
     return sample_id_2_pred_score_seg_dic
