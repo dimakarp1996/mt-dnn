@@ -157,11 +157,11 @@ class MultiTaskBatchSampler(BatchSampler):
         self,
         datasets,
         batch_size,
-        mix_opt,
-        extra_task_ratio,
+        mix_opt=0,
+        extra_task_ratio=0,
         bin_size=64,
         bin_on=False,
-        bin_grow_ratio=0.5,
+        bin_grow_ratio=0.5
     ):
         self._datasets = datasets
         self._batch_size = batch_size
@@ -245,14 +245,13 @@ class MultiTaskBatchSampler(BatchSampler):
             random_picks = int(
                 min(len(train_data_list[0]) * extra_task_ratio, len(extra_indices))
             )
-            extra_indices = np.random.choice(extra_indices, random_picks, replace=False)
+            extra_indices = np.random.choice(extra_indices, random_picks, replace=False, p=None)
             if mix_opt > 0:
                 extra_indices = extra_indices.tolist()
                 random.shuffle(extra_indices)
                 all_indices = extra_indices + main_indices
             else:
                 all_indices = main_indices + extra_indices.tolist()
-
         else:
             for i in range(1, len(train_data_list)):
                 all_indices += [i] * len(train_data_list[i])
@@ -262,6 +261,82 @@ class MultiTaskBatchSampler(BatchSampler):
         if mix_opt < 1:
             random.shuffle(all_indices)
         return all_indices
+
+
+class MultiTaskUniformBatchSampler(MultiTaskBatchSampler):
+    def __init__(
+        self,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+    def get_lens(self, train_data_list):
+        total_sample_num = sum([len(train_data_list[i]) for i in range(len(train_data_list))])
+        avg_number_of_samples = 1 + int(total_sample_num//len(train_data_list))
+        self.lens = {i: avg_number_of_samples for i in range(len(train_data_list))}
+    def __iter__(self):
+        all_iters = [iter(item) for item in self._train_data_list]
+        all_indices = self._gen_task_indices(
+            self._train_data_list, self._mix_opt, self._extra_task_ratio
+        )
+        for local_task_idx in all_indices:
+            task_id = self._datasets[local_task_idx].get_task_id()
+            try:
+                batch = next(all_iters[local_task_idx])
+            except StopIteration:
+                all_iters[local_task_idx] = iter(self._train_data_list[local_task_idx])
+                batch = next(all_iters[local_task_idx])
+            yield [(task_id, sample_id) for sample_id in batch]
+    def _gen_task_indices(self, train_data_list, mix_opt, extra_task_ratio):
+        self.get_lens(train_data_list)
+        all_indices = []
+        if len(train_data_list) > 1 and extra_task_ratio > 0:
+            main_indices = [0] * len(train_data_list[0])
+            extra_indices = []
+            for i in range(1, len(train_data_list)):
+                extra_indices += [i] * len(train_data_list[i])
+            random_picks = int(
+                min(len(train_data_list[0]) * extra_task_ratio, len(extra_indices))
+            )
+            extra_indices = np.random.choice(extra_indices, random_picks, replace=False, p=None)
+            if mix_opt > 0:
+                extra_indices = extra_indices.tolist()
+                random.shuffle(extra_indices)
+                all_indices = extra_indices + main_indices
+            else:
+                all_indices = main_indices + extra_indices.tolist()
+        else:
+            for i in range(1, len(train_data_list)):
+                all_indices += [i] * self.lens[i]
+            if mix_opt > 0:
+                random.shuffle(all_indices)
+            all_indices += [0] * self.lens[0]
+        if mix_opt < 1:
+            random.shuffle(all_indices)
+        return all_indices
+
+
+
+class MultiTaskAnnealBatchSampler(MultiTaskUniformBatchSampler):
+    def __init__(
+        self,
+        datasets,
+        batch_size,
+        mix_opt,
+        extra_task_ratio,
+        bin_size=64,
+        bin_on=False,
+        bin_grow_ratio=0.5,
+        epoch = 0,
+        num_train_epochs = 5
+    ):
+        self.epoch = epoch
+        self.num_train_epochs = num_train_epochs
+        super().__init__(datasets,batch_size,mix_opt,extra_task_ratio,bin_size,bin_on,bin_grow_ratio)
+    def get_lens(self, train_data_list):
+        # for total number of samples not to run out, we multiply every len by constant number, leaving probability ratio to be constant
+        self.lens = {i: int(len(train_data_list[i]) ** ( 1.0 - 0.8 * (self.epoch / self.num_train_epochs)))
+                     for i in range(len(train_data_list))}
 
 
 class MultiTaskDataset(Dataset):

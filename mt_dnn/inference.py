@@ -95,6 +95,8 @@ def eval_model(
     for (batch_info, batch_data) in tqdm(data, total=len(data)):
         batch_info, batch_data = Collater.patch_data(device, batch_info, batch_data)
         score, pred, gold = model.predict(batch_info, batch_data)
+        # if task_type != TaskType.Classification:
+        #    breakpoint()
         scores = merge(score, scores)
         golds = merge(gold, golds)
         predictions = merge(pred, predictions)
